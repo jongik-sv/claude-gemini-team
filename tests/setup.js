@@ -4,7 +4,7 @@
 global.console = {
     ...console,
     // 테스트 중 불필요한 로그 출력 제한
-    log: jest.fn(),
+    log: jest.fn(), // 테스트 중 불필요한 로그 출력 제한
     debug: jest.fn(),
     info: jest.fn(),
     warn: console.warn, // 경고는 표시

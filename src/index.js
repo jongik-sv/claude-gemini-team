@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 const { TeamManager } = require('./core/team-manager');
-const { TeamLogVisualizer } = require('./visualization/log-visualizer');
+const { LogVisualizer } = require('./visualization/log-visualizer');
 const { WorkflowEngine } = require('./core/workflow-engine');
-const { MCPToolOrchestrator } = require('./tools/mcp-orchestrator');
+const { MCPToolManager } = require('./tools/mcp-tool-manager');
+const { ClaudeAgent } = require('./agents/claude-agent');
+const { GeminiAgent } = require('./agents/gemini-agent');
+const { ApiConfigManager } = require('./utils/api-config');
 const chalk = require('chalk');
 
 /**
@@ -12,63 +15,40 @@ const chalk = require('chalk');
 class ClaudeGeminiTeamSystem {
     constructor() {
         this.teamManager = new TeamManager();
-        this.logVisualizer = new TeamLogVisualizer();
+        this.logVisualizer = new LogVisualizer();
         this.workflowEngine = new WorkflowEngine();
-        this.toolOrchestrator = new MCPToolOrchestrator();
+        this.toolManager = new MCPToolManager();
+        this.apiConfig = new ApiConfigManager();
         
         this.isInitialized = false;
+        this.realAiMode = false; // 실제 AI 사용 여부
     }
 
     /**
-     * 팀 초기화 - 4명의 기본 팀원 설정
+     * 팀 초기화 - 실제 AI 에이전트 또는 시뮬레이션 모드
      */
-    async initializeTeam() {
+    async initializeTeam(useRealAI = false) {
         if (this.isInitialized) {
             return;
         }
 
+        this.realAiMode = useRealAI;
         console.log(chalk.bold.magenta('🚀 Claude-Gemini 팀 협업 시스템 초기화 중...'));
         
+        if (this.realAiMode) {
+            console.log(chalk.blue('🤖 실제 AI 모드: Claude & Gemini API 연동'));
+            // API 키 상태 확인
+            this.apiConfig.displayApiStatus();
+        } else {
+            console.log(chalk.yellow('🎭 시뮬레이션 모드: Mock AI 에이전트'));
+        }
+        
         try {
-            // 팀장 Claude 설정
-            await this.teamManager.addTeamMember({
-                id: 'claude_leader',
-                name: '팀장',
-                role: 'leader',
-                capabilities: ['planning', 'coordination', 'quality_assurance'],
-                color: 'blue',
-                mcpEndpoint: 'claude://claude-3-5-sonnet'
-            });
-
-            // 김선임 Claude 설정
-            await this.teamManager.addTeamMember({
-                id: 'kim_senior',
-                name: '김선임',
-                role: 'senior_developer',
-                capabilities: ['complex_coding', 'architecture', 'debugging'],
-                color: 'cyan',
-                mcpEndpoint: 'claude://claude-3-5-sonnet'
-            });
-
-            // 이조사 Gemini 설정
-            await this.teamManager.addTeamMember({
-                id: 'lee_researcher',
-                name: '이조사',
-                role: 'researcher',
-                capabilities: ['data_collection', 'analysis', 'documentation'],
-                color: 'green',
-                mcpEndpoint: 'file:///mnt/c/Project/llm_mcp/gemini-cli-mcp'
-            });
-
-            // 박개발 Gemini 설정
-            await this.teamManager.addTeamMember({
-                id: 'park_developer',
-                name: '박개발',
-                role: 'developer',
-                capabilities: ['coding', 'testing', 'maintenance'],
-                color: 'yellow',
-                mcpEndpoint: 'file:///mnt/c/Project/llm_mcp/gemini-cli-mcp'
-            });
+            if (this.realAiMode) {
+                await this.initializeRealAiAgents();
+            } else {
+                await this.initializeSimulationAgents();
+            }
 
             this.isInitialized = true;
             console.log(chalk.bold.green('✅ 팀 초기화 완료'));
@@ -77,6 +57,137 @@ class ClaudeGeminiTeamSystem {
             console.error(chalk.bold.red('❌ 팀 초기화 실패:'), error.message);
             throw error;
         }
+    }
+
+    /**
+     * 실제 AI 에이전트 초기화
+     */
+    async initializeRealAiAgents() {
+        const claudeConfig = this.apiConfig.getApiConfig('claude');
+        const geminiConfig = this.apiConfig.getApiConfig('gemini');
+
+        // Claude 팀장 (로컬 CLI 우선, API 폴백)
+        const claudeLeader = new ClaudeAgent({
+            id: 'claude_leader',
+            name: '팀장',
+            role: 'leader',
+            capabilities: ['planning', 'coordination', 'quality_assurance', 'strategic_thinking'],
+            color: 'blue',
+            useLocalCLI: true,
+            cliPath: process.env.CLAUDE_CLI_PATH || 'claude',
+            apiKey: claudeConfig.apiKey,
+            apiBaseUrl: claudeConfig.apiUrl,
+            model: 'claude-sonnet-4'
+        });
+
+        // Claude 선임 개발자 (로컬 CLI 우선, API 폴백)
+        const claudeSenior = new ClaudeAgent({
+            id: 'kim_senior',
+            name: '김선임',
+            role: 'senior_developer',
+            capabilities: ['complex_coding', 'architecture', 'debugging', 'code_review'],
+            color: 'cyan',
+            useLocalCLI: true,
+            cliPath: process.env.CLAUDE_CLI_PATH || 'claude',
+            apiKey: claudeConfig.apiKey,
+            apiBaseUrl: claudeConfig.apiUrl,
+            model: 'claude-sonnet-4'
+        });
+
+        // Gemini 연구원 (로컬 CLI 우선, API 폴백)
+        const geminiResearcher = new GeminiAgent({
+            id: 'lee_researcher',
+            name: '이조사',
+            role: 'researcher',
+            capabilities: ['research', 'data_collection', 'analysis', 'documentation'],
+            color: 'green',
+            useLocalCLI: true,
+            cliPath: process.env.GEMINI_CLI_PATH || 'gemini',
+            apiKey: geminiConfig.apiKey,
+            apiBaseUrl: geminiConfig.apiUrl,
+            model: 'gemini-2.5-flash'
+        });
+
+        // Gemini 개발자 (로컬 CLI 우선, API 폴백)
+        const geminiDeveloper = new GeminiAgent({
+            id: 'park_developer',
+            name: '박개발',
+            role: 'developer',
+            capabilities: ['coding', 'testing', 'maintenance', 'implementation'],
+            color: 'yellow',
+            useLocalCLI: true,
+            cliPath: process.env.GEMINI_CLI_PATH || 'gemini',
+            apiKey: geminiConfig.apiKey,
+            apiBaseUrl: geminiConfig.apiUrl,
+            model: 'gemini-2.5-flash'
+        });
+
+        // 에이전트 초기화 및 팀에 추가
+        const agents = [claudeLeader, claudeSenior, geminiResearcher, geminiDeveloper];
+        
+        for (const agent of agents) {
+            try {
+                await agent.initialize();
+                await this.teamManager.addAgent(agent);
+                console.log(chalk.green(`✅ ${agent.name} (${agent.constructor.name}) 초기화 완료`));
+            } catch (error) {
+                console.warn(chalk.yellow(`⚠️  ${agent.name} 초기화 실패, 시뮬레이션 모드로 전환: ${error.message}`));
+                // API 연결 실패시 기본 TeamMember로 대체
+                await this.teamManager.addTeamMember({
+                    id: agent.id,
+                    name: agent.name,
+                    role: agent.role,
+                    capabilities: agent.capabilities,
+                    color: agent.color,
+                    mcpEndpoint: 'simulation://mock'
+                });
+            }
+        }
+    }
+
+    /**
+     * 시뮬레이션 에이전트 초기화 (기존 방식)
+     */
+    async initializeSimulationAgents() {
+        // 팀장 Claude 설정
+        await this.teamManager.addTeamMember({
+            id: 'claude_leader',
+            name: '팀장',
+            role: 'leader',
+            capabilities: ['planning', 'coordination', 'quality_assurance'],
+            color: 'blue',
+            mcpEndpoint: 'simulation://claude-3-5-sonnet'
+        });
+
+        // 김선임 Claude 설정
+        await this.teamManager.addTeamMember({
+            id: 'kim_senior',
+            name: '김선임',
+            role: 'senior_developer',
+            capabilities: ['complex_coding', 'architecture', 'debugging'],
+            color: 'cyan',
+            mcpEndpoint: 'simulation://claude-3-5-sonnet'
+        });
+
+        // 이조사 Gemini 설정
+        await this.teamManager.addTeamMember({
+            id: 'lee_researcher',
+            name: '이조사',
+            role: 'researcher',
+            capabilities: ['data_collection', 'analysis', 'documentation'],
+            color: 'green',
+            mcpEndpoint: 'simulation://gemini-1.5-flash'
+        });
+
+        // 박개발 Gemini 설정
+        await this.teamManager.addTeamMember({
+            id: 'park_developer',
+            name: '박개발',
+            role: 'developer',
+            capabilities: ['coding', 'testing', 'maintenance'],
+            color: 'yellow',
+            mcpEndpoint: 'simulation://gemini-1.5-flash'
+        });
     }
 
     /**
@@ -136,7 +247,7 @@ class ClaudeGeminiTeamSystem {
 
         try {
             // MCP 도구 할당
-            await this.toolOrchestrator.assignToolToAgent(
+            await this.toolManager.assignToolToAgent(
                 task.assignee,
                 task.type
             );
@@ -165,8 +276,9 @@ class ClaudeGeminiTeamSystem {
      */
     startProgressMonitoring() {
         const intervalId = setInterval(() => {
-            const teamStatus = this.teamManager.getTeamStatus();
-            this.logVisualizer.displayTeamStatus(teamStatus);
+            const teamStatus = this.teamManager.getTeamStatusDetailed();
+            // 로그로 상태 출력 (LogVisualizer에 displayTeamStatus 메서드가 없으므로)
+            this.logVisualizer.info('system', `팀 상태: ${teamStatus.activeMembers}/${teamStatus.totalMembers} 활성`, teamStatus);
         }, 5000);
 
         // 정리 함수 등록

@@ -19,7 +19,12 @@
     "full-dashboard": "node src/cli.js full-dashboard",
     "monitor": "node src/cli.js monitor",
     "monitor-simple": "node src/cli.js monitor-simple",
-    "add-member": "node src/cli.js add-member"
+    "add-member": "node src/cli.js add-member",
+    "setup-api": "node src/cli.js setup-api",
+    "api-status": "node src/cli.js api-status",
+    "test-api": "node src/cli.js test-api",
+    "test-cli": "node src/cli.js test-cli",
+    "start-ai": "node src/cli.js start-ai"
   },
   "keywords": [
     "ai",
@@ -35,8 +40,10 @@
     "chalk": "^4.1.2",
     "chokidar": "^4.0.3",
     "commander": "^14.0.0",
+    "dotenv": "^17.0.1",
     "eslint": "^9.30.1",
     "jest": "^30.0.4",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "redis": "^5.5.6",
     "winston": "^3.17.0",

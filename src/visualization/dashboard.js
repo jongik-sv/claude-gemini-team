@@ -3,12 +3,12 @@
  * Combines log visualization and progress tracking
  */
 
-import { LogVisualizer } from './log-visualizer.js';
-import { ProgressVisualizer } from './progress-visualizer.js';
-import { EventEmitter } from 'events';
-import chalk from 'chalk';
+const { LogVisualizer } = require('./log-visualizer.js');
+const { ProgressVisualizer } = require('./progress-visualizer.js');
+const { EventEmitter } = require('events');
+const chalk = require('chalk');
 
-export class Dashboard extends EventEmitter {
+class Dashboard extends EventEmitter {
     constructor(config = {}) {
         super();
         this.config = {
@@ -46,8 +46,14 @@ export class Dashboard extends EventEmitter {
     setupKeyboardHandlers() {
         if (!this.config.enableKeyboard) return;
         
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
+        // Check if setRawMode is available (not available in some environments)
+        if (process.stdin.setRawMode) {
+            process.stdin.setRawMode(true);
+            process.stdin.resume();
+        } else {
+            console.log(chalk.yellow('⚠️  키보드 제어가 이 환경에서는 지원되지 않습니다.'));
+            return;
+        }
         process.stdin.setEncoding('utf8');
         
         process.stdin.on('data', (key) => {
@@ -390,3 +396,5 @@ export class Dashboard extends EventEmitter {
         };
     }
 }
+
+module.exports = { Dashboard };

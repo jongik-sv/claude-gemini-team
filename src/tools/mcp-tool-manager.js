@@ -202,8 +202,10 @@ class MCPTool extends EventEmitter {
  * MCP 도구 관리자 - Model Context Protocol 도구들을 관리
  */
 class MCPToolManager extends EventEmitter {
-    constructor() {
+    constructor(config = null) {
         super();
+        
+        this.config = config;
         
         // 도구 저장소
         this.tools = new Map(); // id -> MCPTool

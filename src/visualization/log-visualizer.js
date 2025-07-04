@@ -3,10 +3,10 @@
  * Provides colored, structured logging for multi-agent system
  */
 
-import chalk from 'chalk';
-import { EventEmitter } from 'events';
+const chalk = require('chalk');
+const { EventEmitter } = require('events');
 
-export class LogVisualizer extends EventEmitter {
+class LogVisualizer extends EventEmitter {
     constructor(config = {}) {
         super();
         this.config = {
@@ -331,3 +331,8 @@ export class LogVisualizer extends EventEmitter {
         return stats;
     }
 }
+
+// Alias for backward compatibility
+const TeamLogVisualizer = LogVisualizer;
+
+module.exports = { LogVisualizer, TeamLogVisualizer };

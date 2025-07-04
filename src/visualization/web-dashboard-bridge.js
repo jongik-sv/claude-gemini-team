@@ -3,12 +3,12 @@
  * Connects existing visualization system with WebSocket server
  */
 
-import { RealtimeMonitoringServer } from './websocket-server.js';
-import { Dashboard } from './dashboard.js';
-import { EventEmitter } from 'events';
-import chalk from 'chalk';
+const { RealtimeMonitoringServer } = require('./websocket-server.js');
+const { Dashboard } = require('./dashboard.js');
+const { EventEmitter } = require('events');
+const chalk = require('chalk');
 
-export class WebDashboardBridge extends EventEmitter {
+class WebDashboardBridge extends EventEmitter {
     constructor(config = {}) {
         super();
         this.config = {
@@ -521,3 +521,5 @@ export class WebDashboardBridge extends EventEmitter {
         return health;
     }
 }
+
+module.exports = { WebDashboardBridge };

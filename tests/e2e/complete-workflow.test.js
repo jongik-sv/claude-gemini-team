@@ -9,6 +9,7 @@ import { MessageBroker } from '../../src/communication/message-broker.js';
 import { MCPToolManager } from '../../src/tools/mcp-tool-manager.js';
 import { ClaudeAgent } from '../../src/agents/claude-agent.js';
 import { GeminiAgent } from '../../src/agents/gemini-agent.js';
+import { Task } from '../../src/agents/base-agent.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -169,7 +170,9 @@ describe('Complete Workflow E2E Test', () => {
         const researchTasks = assignments['gemini_researcher'] || [];
         expect(researchTasks.length).toBeGreaterThan(0);
         
-        for (const task of researchTasks) {
+        for (const taskData of researchTasks) {
+            // Convert plain object to Task instance
+            const task = new Task(taskData);
             const result = await researcher.executeTask(task);
             expect(result).toBeDefined();
             expect(result.status).toBe('completed');
@@ -194,8 +197,9 @@ describe('Complete Workflow E2E Test', () => {
             t.type === 'architecture' || t.type === 'design'
         );
         
-        for (const task of architectureTasks) {
-            const agent = task.assignedTo === 'claude_leader' ? teamLeader : seniorDev;
+        for (const taskData of architectureTasks) {
+            const agent = taskData.assignedTo === 'claude_leader' ? teamLeader : seniorDev;
+            const task = new Task(taskData);
             const result = await agent.executeTask(task);
             expect(result).toBeDefined();
             
@@ -203,7 +207,7 @@ describe('Complete Workflow E2E Test', () => {
             const resultPath = path.join(sharedDir, 'results', `${task.id}.json`);
             fs.writeFileSync(resultPath, JSON.stringify({
                 taskId: task.id,
-                agentId: task.assignedTo,
+                agentId: taskData.assignedTo,
                 result: result.output,
                 timestamp: new Date().toISOString()
             }, null, 2));
@@ -216,7 +220,8 @@ describe('Complete Workflow E2E Test', () => {
         const developmentTasks = assignments['gemini_developer'] || [];
         expect(developmentTasks.length).toBeGreaterThan(0);
         
-        for (const task of developmentTasks) {
+        for (const taskData of developmentTasks) {
+            const task = new Task(taskData);
             const result = await developer.executeTask(task);
             expect(result).toBeDefined();
             

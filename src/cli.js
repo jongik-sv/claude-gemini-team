@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-import { program } from 'commander';
-import { ClaudeGeminiTeamSystem } from './index.js';
-import { Dashboard } from './visualization/dashboard.js';
-import { WebDashboardBridge } from './visualization/web-dashboard-bridge.js';
-import chalk from 'chalk';
+const { program } = require('commander');
+const { ClaudeGeminiTeamSystem } = require('./index.js');
+const { Dashboard } = require('./visualization/dashboard.js');
+const { WebDashboardBridge } = require('./visualization/web-dashboard-bridge.js');
+const { ApiConfigManager } = require('./utils/api-config.js');
+const chalk = require('chalk');
 
 // CLI 버전 정보
 program
@@ -403,6 +404,175 @@ program
         Object.entries(config).forEach(([key, value]) => {
             console.log(`${key}: ${value}`);
         });
+    });
+
+// API 키 설정 명령
+program
+    .command('setup-api')
+    .description('API 키 대화형 설정')
+    .action(async () => {
+        console.log(chalk.bold.magenta('🔑 API 키 설정을 시작합니다...'));
+        
+        try {
+            const apiConfig = new ApiConfigManager();
+            await apiConfig.interactiveSetup();
+        } catch (error) {
+            console.error(chalk.bold.red('❌ API 설정 실패:'), error.message);
+            process.exit(1);
+        }
+    });
+
+// API 상태 확인 명령
+program
+    .command('api-status')
+    .description('API 키 설정 상태 확인')
+    .action(() => {
+        const apiConfig = new ApiConfigManager();
+        apiConfig.displayApiStatus();
+        apiConfig.displaySetupGuide();
+    });
+
+// 로컬 CLI 테스트 명령
+program
+    .command('test-cli')
+    .description('로컬 Claude/Gemini CLI 연결 테스트')
+    .option('--claude', 'Claude CLI만 테스트')
+    .option('--gemini', 'Gemini CLI만 테스트')
+    .action(async (options) => {
+        console.log(chalk.bold.blue('🔍 로컬 CLI 연결 테스트 시작...'));
+        
+        try {
+            const { ClaudeAgent } = require('./agents/claude-agent');
+            const { GeminiAgent } = require('./agents/gemini-agent');
+            let results = {};
+            
+            if (options.claude || (!options.claude && !options.gemini)) {
+                const claudeAgent = new ClaudeAgent({
+                    id: 'test_claude',
+                    name: 'Test Claude',
+                    role: 'tester',
+                    cliPath: process.env.CLAUDE_CLI_PATH || 'claude'
+                });
+                results.claude = await claudeAgent.validateLocalCLI();
+            }
+            
+            if (options.gemini || (!options.claude && !options.gemini)) {
+                const geminiAgent = new GeminiAgent({
+                    id: 'test_gemini',
+                    name: 'Test Gemini',
+                    role: 'tester',
+                    cliPath: process.env.GEMINI_CLI_PATH || 'gemini'
+                });
+                results.gemini = await geminiAgent.validateLocalCLI();
+            }
+            
+            console.log(chalk.bold.blue('\n📊 테스트 결과:'));
+            console.log(chalk.dim('─'.repeat(30)));
+            
+            Object.entries(results).forEach(([provider, success]) => {
+                const icon = success ? '✅' : '❌';
+                const status = success ? 'CLI 사용 가능' : 'CLI 없음';
+                console.log(`${icon} ${provider.toUpperCase()}: ${status}`);
+            });
+            
+            const allSuccessful = Object.values(results).every(result => result === true);
+            if (allSuccessful) {
+                console.log(chalk.green('\n🎉 모든 로컬 CLI가 사용 가능합니다!'));
+            } else {
+                console.log(chalk.yellow('\n⚠️  일부 CLI를 찾을 수 없습니다. 설치 상태를 확인해주세요.'));
+                console.log(chalk.gray('💡 Claude CLI: https://github.com/anthropics/claude-cli'));
+                console.log(chalk.gray('💡 Gemini CLI: https://github.com/google-gemini/gemini-cli'));
+            }
+            
+        } catch (error) {
+            console.error(chalk.bold.red('❌ CLI 테스트 실패:'), error.message);
+            process.exit(1);
+        }
+    });
+
+// API 연결 테스트 명령
+program
+    .command('test-api')
+    .description('API 연결 테스트')
+    .option('--claude', 'Claude API만 테스트')
+    .option('--gemini', 'Gemini API만 테스트')
+    .action(async (options) => {
+        console.log(chalk.bold.blue('🔍 API 연결 테스트 시작...'));
+        
+        try {
+            const apiConfig = new ApiConfigManager();
+            let results = {};
+            
+            if (options.claude || (!options.claude && !options.gemini)) {
+                results.claude = await apiConfig.testApiConnection('claude');
+            }
+            
+            if (options.gemini || (!options.claude && !options.gemini)) {
+                results.gemini = await apiConfig.testApiConnection('gemini');
+            }
+            
+            console.log(chalk.bold.blue('\n📊 테스트 결과:'));
+            console.log(chalk.dim('─'.repeat(30)));
+            
+            Object.entries(results).forEach(([provider, success]) => {
+                const icon = success ? '✅' : '❌';
+                const status = success ? '연결 성공' : '연결 실패';
+                console.log(`${icon} ${provider.toUpperCase()}: ${status}`);
+            });
+            
+            const allSuccessful = Object.values(results).every(result => result === true);
+            if (allSuccessful) {
+                console.log(chalk.green('\n🎉 모든 API 연결이 성공했습니다!'));
+            } else {
+                console.log(chalk.yellow('\n⚠️  일부 API 연결에 문제가 있습니다. API 키를 확인해주세요.'));
+            }
+            
+        } catch (error) {
+            console.error(chalk.bold.red('❌ API 테스트 실패:'), error.message);
+            process.exit(1);
+        }
+    });
+
+// 실제 AI로 프로젝트 시작 명령
+program
+    .command('start-ai')
+    .description('실제 AI를 사용하여 프로젝트 시작')
+    .argument('<project>', '프로젝트 설명')
+    .option('-v, --verbose', '상세 로그 출력')
+    .option('--test-first', '먼저 API 연결 테스트')
+    .action(async (project, options) => {
+        console.log(chalk.bold.magenta('🤖 실제 AI 모드로 프로젝트 시작!'));
+        
+        try {
+            const apiConfig = new ApiConfigManager();
+            
+            if (options.testFirst) {
+                console.log(chalk.blue('🔍 API 연결 먼저 테스트 중...'));
+                const claudeTest = await apiConfig.testApiConnection('claude');
+                const geminiTest = await apiConfig.testApiConnection('gemini');
+                
+                if (!claudeTest && !geminiTest) {
+                    console.log(chalk.red('❌ 모든 API 연결에 실패했습니다. API 키를 확인해주세요.'));
+                    console.log(chalk.yellow('💡 npm run setup-api 명령어로 API 키를 설정할 수 있습니다.'));
+                    process.exit(1);
+                }
+            }
+            
+            const teamSystem = new ClaudeGeminiTeamSystem();
+            
+            if (options.verbose) {
+                console.log(chalk.gray('상세 로그 모드 활성화'));
+            }
+            
+            // 실제 AI 모드로 팀 초기화
+            await teamSystem.initializeTeam(true);
+            await teamSystem.executeProject(project);
+            
+        } catch (error) {
+            console.error(chalk.bold.red('❌ 실행 실패:'), error.message);
+            console.log(chalk.yellow('💡 API 키가 설정되어 있는지 확인해주세요: npm run api-status'));
+            process.exit(1);
+        }
     });
 
 // 도움말 개선

@@ -97,15 +97,40 @@ class TeamMember {
  * 팀 관리 시스템 - 팀원 추가/제거, 상태 관리, 작업 할당
  */
 class TeamManager extends EventEmitter {
-    constructor() {
+    constructor(config = null) {
         super();
         this.teamMembers = new Map();
-        this.config = null;
+        this.config = config;
         this.maxTeamSize = 10;
         this.stateFile = path.join(__dirname, '../../shared/states/team-state.json');
         
-        this.loadConfig();
+        // 기본 설정 보장
+        if (!this.config) {
+            this.config = { 
+                team: { 
+                    maxSize: 10,
+                    defaultRoles: ['leader', 'senior_developer', 'researcher', 'developer']
+                }
+            };
+            this.maxTeamSize = 10;
+        } else {
+            this.maxTeamSize = this.config.maxTeamSize || this.config.team?.maxSize || 10;
+        }
         this.setupEventHandlers();
+    }
+
+    /**
+     * 시스템 초기화
+     */
+    async initialize() {
+        await this.loadConfig();
+        
+        // 테스트 환경에서는 이전 상태를 로드하지 않음
+        if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
+            await this.loadTeamState();
+        }
+        
+        console.log(chalk.green('✅ TeamManager 초기화 완료'));
     }
 
     /**
@@ -119,7 +144,13 @@ class TeamManager extends EventEmitter {
             this.maxTeamSize = this.config.team?.maxSize || 10;
         } catch (error) {
             console.warn(chalk.yellow('⚠️  팀 설정 파일을 로드할 수 없습니다. 기본 설정을 사용합니다.'));
-            this.config = { team: { maxSize: 10 } };
+            this.config = { 
+                team: { 
+                    maxSize: 10,
+                    defaultRoles: ['leader', 'senior_developer', 'researcher', 'developer']
+                }
+            };
+            this.maxTeamSize = 10;
         }
     }
 
@@ -128,17 +159,60 @@ class TeamManager extends EventEmitter {
      */
     setupEventHandlers() {
         // 정기적인 상태 저장
-        setInterval(() => {
+        this.saveStateInterval = setInterval(() => {
             this.saveTeamState().catch(error => {
                 console.error(chalk.red('팀 상태 저장 실패:'), error.message);
             });
         }, 30000); // 30초마다 저장
 
         // 하트비트 체크
-        setInterval(() => {
+        this.heartbeatInterval = setInterval(() => {
             this.checkHeartbeats();
         }, 60000); // 1분마다 체크
     }
+
+    /**
+     * 에이전트 추가 (addAgent alias)
+     */
+    async addAgent(agent) {
+        try {
+            // 중복 ID 확인
+            if (this.teamMembers.has(agent.id)) {
+                throw new Error(`이미 존재하는 팀원 ID: ${agent.id}`);
+            }
+
+            // 팀 크기 제한 확인
+            if (this.teamMembers.size >= this.maxTeamSize) {
+                throw new Error(`팀 크기 제한 초과 (최대 ${this.maxTeamSize}명)`);
+            }
+
+            // 실제 에이전트 객체를 직접 저장
+            this.teamMembers.set(agent.id, agent);
+            
+            // 이벤트 발행
+            this.emit('member_added', agent);
+
+            console.log(
+                chalk.bold.green(`✅ ${agent.name} (${agent.role})이 팀에 추가되었습니다.`)
+            );
+
+            // 상태 저장
+            await this.saveTeamState();
+
+            return true;
+        } catch (error) {
+            console.error(`Failed to add agent ${agent.id}:`, error.message);
+            return false;
+        }
+    }
+
+    /**
+     * 팀 멤버 목록 조회
+     */
+    getTeamMembers() {
+        return Array.from(this.teamMembers.values());
+    }
+
 
     /**
      * 팀원 추가
@@ -293,9 +367,9 @@ class TeamManager extends EventEmitter {
     }
 
     /**
-     * 팀 상태 조회
+     * 팀 상태 조회 (상세 정보가 필요한 경우)
      */
-    getTeamStatus() {
+    getTeamStatusDetailed() {
         const members = {};
         
         for (const [id, member] of this.teamMembers) {
@@ -317,6 +391,16 @@ class TeamManager extends EventEmitter {
             busyMembers: Array.from(this.teamMembers.values()).filter(m => m.status === 'busy').length,
             members
         };
+    }
+
+    /**
+     * 팀 상태 조회 (문자열 상태 반환)
+     */
+    getTeamStatus() {
+        const activeMembers = Array.from(this.teamMembers.values())
+            .filter(member => member.status !== 'offline').length;
+        
+        return activeMembers > 0 ? 'active' : 'inactive';
     }
 
     /**
@@ -412,6 +496,46 @@ class TeamManager extends EventEmitter {
             
         } catch (error) {
             console.log(chalk.gray('이전 팀 상태 파일이 없습니다. 새로 시작합니다.'));
+        }
+    }
+
+    /**
+     * 시스템 종료
+     */
+    async shutdown() {
+        try {
+            // 진행 중인 작업이 있는 팀원들에게 종료 알림
+            for (const [memberId, member] of this.teamMembers) {
+                if (member.status === 'busy') {
+                    console.warn(
+                        chalk.yellow(`⚠️  ${member.name}이 작업 중입니다. 강제 종료합니다.`)
+                    );
+                    this.updateMemberStatus(memberId, 'offline');
+                }
+            }
+
+            // 정기적인 작업들 중지
+            if (this.heartbeatInterval) {
+                clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
+            }
+
+            if (this.saveStateInterval) {
+                clearInterval(this.saveStateInterval);
+                this.saveStateInterval = null;
+            }
+
+            // 최종 상태 저장
+            await this.saveTeamState();
+
+            // 팀원 정보 정리
+            this.teamMembers.clear();
+
+            this.emit('shutdown');
+            console.log(chalk.green('✅ TeamManager 종료 완료'));
+        } catch (error) {
+            console.error(chalk.red('❌ TeamManager 종료 실패:'), error.message);
+            throw error;
         }
     }
 
