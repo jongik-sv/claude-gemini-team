@@ -257,3 +257,286 @@
 - 웹 대시보드 구현 (HTML5 + CSS3 + JavaScript + WebSocket)
 - 브릿지 시스템 구현 (CLI ↔ Web 실시간 동기화)
 - 새로운 CLI 명령어: web-dashboard, full-dashboard
+
+
+
+## 마지막 작업 이력
+● Update Todos
+  ⎿  ☒ 실제 프로젝트 워크플로우 개선 (더 현실적인 태스크 분배)
+     ☐ 로컬 CLI 응답 파싱 및 구조화 개선
+     ☐ 실시간 대시보드에 로컬 CLI 상태 표시
+     ☐ 실제 AI 결과물 파일 생성 기능
+     ☐ 성능 최적화 및 동시 실행 개선
+     ☐ 사용자 가이드 및 문서 업데이트
+
+● 먼저 현재 Claude와 Gemini 에이전트의 CLI 응답 처리 방식을 개선하겠습니다. 새로운 응답
+  파서를 만들어 JSON, 코드 블록, 마크다운 등을 구조화해서 처리하도록 하겠습니다.
+
+● Write(src/utils/response-parser.js)
+  ⎿  Wrote 432 lines to src/utils/response-parser.js      
+     /**
+      * AI 응답 파싱 및 구조화 유틸리티
+      * Claude 및 Gemini CLI 응답을 구조화된 데이터로 변환
+      */
+     const chalk = require('chalk');
+     class ResponseParser {
+         constructor() {
+             this.patterns = {
+     … +422 lines (ctrl+r to expand)
+
+● 이제 Claude 에이전트에서 새로운 응답 파서를 사용하도록 업데이트하겠습니다:
+
+● Read(src/agents/claude-agent.js)
+  ⎿  Read 50 lines (ctrl+r to expand)
+
+● Update(src/agents/claude-agent.js)
+  ⎿  Updated src/agents/claude-agent.js with 1 addition                    
+       1    const { BaseAgent, Task } = require('./base-agent');
+       2 +  const { ResponseParser } = require('../utils/response-parser');
+       3    const fetch = require('node-fetch');
+       4    const { execSync, spawn } = require('child_process');
+       5    const fs = require('fs').promises;
+
+● Update(src/agents/claude-agent.js)
+  ⎿  Updated src/agents/claude-agent.js with 3 additions                                
+       21            this.apiKey = config.apiKey || process.env.CLAUDE_API_KEY || null;
+       22            this.apiBaseUrl = config.apiBaseUrl || process.env.CLAUDE_API_URL 
+     ||
+             'https://api.anthropic.com/v1/messages';
+       23            
+       24 +          // 응답 파서 초기화
+       25 +          this.responseParser = new ResponseParser();
+       26 +          
+       27            // Claude 특화 능력 기본값
+       28            if (!this.capabilities || this.capabilities.length === 0) {
+       29                this.capabilities = ['planning', 'strategic_thinking', 
+     'coordina
+            tion', 'complex_coding'];
+
+● 이제 processLocalCLIResponse 메서드를 새로운 파서를 사용하도록 개선하겠습니다:
+
+● Read(src/agents/claude-agent.js)
+  ⎿  Read 60 lines (ctrl+r to expand)
+
+● Update(src/agents/claude-agent.js)
+  ⎿  Updated src/agents/claude-agent.js with 84 additions and 11 removals               
+       214        }
+       215    
+       216        /**
+       217 -       * 로컬 CLI 응답 처리
+       217 +       * 로컬 CLI 응답 처리 (개선된 버전)
+       218         * @param {string} response - CLI 응답
+       219         * @param {Task} task - 원본 태스크
+       220         * @returns {Object} 처리된 결과
+       221         */
+       222        processLocalCLIResponse(response, task) {
+       223            try {
+       224 -              // JSON 응답 파싱 시도
+       225 -              try {
+       226 -                  return JSON.parse(response);
+       227 -              } catch (parseError) {
+       228 -                  // JSON 파싱 실패시 텍스트 응답으로 처리
+       224 +              // 응답 파싱 및 구조화
+       225 +              const parsed = this.responseParser.parseResponse(response, 
+     'claude');
+           + ude');
+       226 +              
+       227 +              // 응답 분석 로깅 (상세 모드에서만)
+       228 +              if (process.env.VERBOSE_PARSING === 'true') {
+       229 +                  this.responseParser.displayParsedResponse(parsed);
+       230 +              }
+       231 +  
+       232 +              // JSON 데이터가 있는 경우 우선 사용
+       233 +              if (parsed.structure.hasJson && parsed.content.json.length > 
+     0)
+           +  {
+       234 +                  const primaryJson = parsed.content.json.find(json => 
+     json.v
+           + alid);
+       235 +                  if (primaryJson) {
+       236 +                      return {
+       237 +                          analysis: 'Structured JSON response from Claude 
+     CLI
+           + ',
+       238 +                          result: primaryJson.parsed,
+       239 +                          reasoning: `Parsed ${primaryJson.type} data with 
+     ${
+           + Object.keys(primaryJson.parsed).length} properties`,
+       240 +                          format: 'json',
+       241 +                          source: 'local-cli',
+       242 +                          metadata: {
+       243 +                              parsed: parsed,
+       244 +                              summary: parsed.summary,
+       245 +                              structure: parsed.structure
+       246 +                          }
+       247 +                      };
+       248 +                  }
+       249 +              }
+       250 +  
+       251 +              // 코드 블록이 있는 경우
+       252 +              if (parsed.structure.hasCode && 
+     parsed.content.codeBlocks.lengt
+           + h > 0) {
+       253 +                  const primaryCode = parsed.content.codeBlocks[0];
+       254                    return {
+       255 -                      analysis: 'Response received from Claude CLI',
+       256 -                      result: response,
+       257 -                      reasoning: 'Raw text response from Claude CLI',
+       258 -                      format: 'text',
+       259 -                      source: 'local-cli'
+       255 +                      analysis: 'Code response from Claude CLI',
+       256 +                      result: {
+       257 +                          code: primaryCode.code,
+       258 +                          language: primaryCode.language,
+       259 +                          lineCount: primaryCode.lineCount,
+       260 +                          allCodeBlocks: parsed.content.codeBlocks
+       261 +                      },
+       262 +                      reasoning: `Generated ${primaryCode.language} code 
+     with
+           +  ${primaryCode.lineCount} lines`,
+       263 +                      format: 'code',
+       264 +                      source: 'local-cli',
+       265 +                      metadata: {
+       266 +                          parsed: parsed,
+       267 +                          summary: parsed.summary,
+       268 +                          structure: parsed.structure
+       269 +                      }
+       270                    };
+       271                }
+       272 +  
+       273 +              // 구조화된 마크다운 응답
+       274 +              if (parsed.structure.hasMarkdown && 
+     parsed.content.headers.leng
+           + th > 0) {
+       275 +                  return {
+       276 +                      analysis: 'Structured markdown response from Claude 
+     CLI
+           + ',
+       277 +                      result: {
+       278 +                          text: parsed.content.text,
+       279 +                          headers: parsed.content.headers,
+       280 +                          lists: parsed.content.lists,
+       281 +                          tables: parsed.content.tables
+       282 +                      },
+       283 +                      reasoning: `Structured content with 
+     ${parsed.content.he
+           + aders.length} sections`,
+       284 +                      format: 'markdown',
+       285 +                      source: 'local-cli',
+       286 +                      metadata: {
+       287 +                          parsed: parsed,
+       288 +                          summary: parsed.summary,
+       289 +                          structure: parsed.structure
+       290 +                      }
+       291 +                  };
+       292 +              }
+       293 +  
+       294 +              // 기본 텍스트 응답
+       295 +              return {
+       296 +                  analysis: 'Text response from Claude CLI',
+       297 +                  result: parsed.content.text || response,
+       298 +                  reasoning: `Plain text response 
+     (${parsed.content.metadata.
+           + wordCount} words, ${parsed.content.metadata.sentiment} sentiment)`,
+       299 +                  format: 'text',
+       300 +                  source: 'local-cli',
+       301 +                  metadata: {
+       302 +                      parsed: parsed,
+       303 +                      summary: parsed.summary,
+       304 +                      structure: parsed.structure,
+       305 +                      wordCount: parsed.content.metadata.wordCount,
+       306 +                      sentiment: parsed.content.metadata.sentiment
+       307 +                  }
+       308 +              };
+       309 +  
+       310            } catch (error) {
+       311                throw new Error(`Failed to process Claude CLI response: 
+     ${error
+             .message}`);
+       312            }
+
+● 이제 Gemini 에이전트에도 동일한 개선사항을 적용하겠습니다:
+
+● Read(src/agents/gemini-agent.js)
+  ⎿  Read 30 lines (ctrl+r to expand)
+
+● Update(src/agents/gemini-agent.js)
+  ⎿  Updated src/agents/gemini-agent.js with 1 addition                    
+       1    const { BaseAgent, Task } = require('./base-agent');
+       2 +  const { ResponseParser } = require('../utils/response-parser');
+       3    const fetch = require('node-fetch');
+       4    const { execSync, spawn } = require('child_process');
+       5    const fs = require('fs').promises;
+
+● Update(src/agents/gemini-agent.js)
+  ⎿  Updated src/agents/gemini-agent.js with 3 additions                                
+       21            this.apiKey = config.apiKey || process.env.GEMINI_API_KEY || null;
+       22            this.apiBaseUrl = config.apiBaseUrl || process.env.GEMINI_API_URL 
+     ||
+             'https://generativelanguage.googleapis.com/v1beta/models';
+       23            
+       24 +          // 응답 파서 초기화
+       25 +          this.responseParser = new ResponseParser();
+       26 +          
+       27            // Gemini 특화 능력 기본값
+       28            if (!this.capabilities || this.capabilities.length === 0) {
+       29                this.capabilities = ['research', 'data_collection', 'analysis', 
+            'documentation'];
+
+● 이제 Gemini의 processLocalCLIResponse 메서드도 업데이트하겠습니다:
+
+● Task(Update Gemini processLocalCLIResponse)
+  ⎿  Done (5 tool uses · 47.6k tokens · 1m 7.0s)                                        
+
+● 이제 간단한 테스트 스크립트를 만들어 새로운 응답 파서를 테스트해보겠습니다:
+
+● Write(test-response-parser.js)
+  ⎿  Wrote 176 lines to test-response-parser.js                        
+     #!/usr/bin/env node
+     /**
+      * 응답 파서 테스트 스크립트
+      */
+     const { ResponseParser } = require('./src/utils/response-parser');
+     const chalk = require('chalk');
+     function testResponseParser() {
+     … +166 lines (ctrl+r to expand)
+
+● package.json에 테스트 스크립트를 추가하겠습니다:
+
+● Update(package.json)
+  ⎿  Updated package.json with 1 addition                               
+       25        "test-api": "node src/cli.js test-api",
+       26        "test-cli": "node src/cli.js test-cli",
+       27        "test-ai-workflow": "node test-ai-workflow.js",
+       28 +      "test-response-parser": "node test-response-parser.js",
+       29        "start-ai": "node src/cli.js start-ai"
+       30      },
+       31      "keywords": [
+
+● 이제 응답 파서를 테스트해보겠습니다:
+
+● Bash(npm run test-response-parser)
+  ⎿  > claude-gemini-team@1.0.0 test-response-parser
+     > node test-response-parser.js
+
+     … +68 lines (ctrl+r to expand)
+
+● 훌륭합니다! 응답 파서가 잘 작동하고 있습니다. 이제 실제 CLI 테스트에서 개선된 파싱을
+  확인해보겠습니다. 상세 파싱 모드를 활성화해서 AI 워크플로우를 다시 테스트해보겠습니다:
+
+● Bash(VERBOSE_PARSING=true npm run test-ai-workflow)
+  ⎿  Error: Command timed out after 3m 0.0s ⚠️  AI 분석 실패, 기본 분석으로 대체
+     ⚠️  AI 분석 실패, 기본 분석으로 대체
+     ⚠️  AI 분석 실패, 기본 분석으로 대체
+     ⚠️  18 개의 태스크가 완료되지 않았습니다.
+
+
+     > claude-gemini-team@1.0.0 test-ai-workflow
+     > node test-ai-workflow.js
+
+     [dotenv@17.0.1] injecting env (26) from .env – [tip] encrypt with dotenvx: 
+     https://dotenvx.com
+     … +153 lines (ctrl+r to see all)
+  ⎿  Claude usage limit reached. Your limit will reset at 11am (Asia/Seoul).
+
+      • /upgrade to increase your usage limit.

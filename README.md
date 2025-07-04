@@ -24,10 +24,12 @@ Claude-Gemini Team is a cutting-edge multi-agent collaboration system that combi
 
 ### 🎯 Key Highlights
 
-- **🧠 Intelligent Agent Orchestration**: Strategic task distribution based on AI model strengths
+- **🧠 AI-Powered Project Analysis**: Intelligent project breakdown using Claude Sonnet 4 and Gemini 2.5 Flash
+- **🔧 Local CLI Integration**: Supports locally installed Claude and Gemini CLI tools with API fallback
 - **📊 Real-time Visualization**: Web and CLI dashboards with live monitoring
-- **🔄 Dynamic Workflow Engine**: Adaptive task management and dependency resolution
+- **🔄 Smart Workflow Engine**: AI-driven task generation with realistic time estimates and role assignments
 - **🌐 WebSocket Integration**: Real-time communication and state synchronization
+- **📋 Intelligent Task Distribution**: Context-aware assignment based on agent capabilities and project type
 - **🛠️ MCP Tool Ecosystem**: Extensible tool integration via Model Context Protocol
 - **🧪 Test-Driven Development**: 161 tests with 84% coverage ensuring reliability
 
@@ -105,6 +107,14 @@ npm run full-dashboard     # Integrated CLI + Web dashboard
 
 # Monitoring Commands
 npm run monitor           # Advanced monitoring with real-time updates
+
+# AI Workflow Testing
+npm run test-ai-workflow   # Test AI-powered project analysis and task generation
+
+# Local CLI Commands
+npm run test-cli          # Test local Claude/Gemini CLI connectivity
+npm run setup-api         # Interactive API key configuration
+npm run api-status        # Check API connection status
 npm run monitor-simple    # Simple monitoring interface
 
 # Project Management

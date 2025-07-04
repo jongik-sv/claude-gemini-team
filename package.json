@@ -24,6 +24,8 @@
     "api-status": "node src/cli.js api-status",
     "test-api": "node src/cli.js test-api",
     "test-cli": "node src/cli.js test-cli",
+    "test-ai-workflow": "node test-ai-workflow.js",
+    "test-response-parser": "node test-response-parser.js",
     "start-ai": "node src/cli.js start-ai"
   },
   "keywords": [

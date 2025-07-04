@@ -19,7 +19,10 @@
       "mcp__gemini-cli-mcp__gemini_chat",
       "mcp__llm-mcp__list_models",
       "mcp__llm-mcp__chat",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(npm run test-ai-workflow:*)",
+      "Bash(npm run test-response-parser:*)",
+      "Bash(VERBOSE_PARSING=true npm run test-ai-workflow)"
     ]
   },
   "enableAllProjectMcpServers": true,

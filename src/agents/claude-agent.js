@@ -1,4 +1,5 @@
 const { BaseAgent, Task } = require('./base-agent');
+const { ResponseParser } = require('../utils/response-parser');
 const fetch = require('node-fetch');
 const { execSync, spawn } = require('child_process');
 const fs = require('fs').promises;
@@ -19,6 +20,9 @@ class ClaudeAgent extends BaseAgent {
         this.useLocalCLI = config.useLocalCLI !== false; // 기본값 true
         this.apiKey = config.apiKey || process.env.CLAUDE_API_KEY || null;
         this.apiBaseUrl = config.apiBaseUrl || process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/messages';
+        
+        // 응답 파서 초기화
+        this.responseParser = new ResponseParser();
         
         // Claude 특화 능력 기본값
         if (!this.capabilities || this.capabilities.length === 0) {
@@ -117,19 +121,20 @@ class ClaudeAgent extends BaseAgent {
         const startTime = Date.now();
         
         try {
-            // 임시 파일에 프롬프트 저장
+            // 프롬프트를 shell-safe하게 변환 (임시 파일 사용)
             const tempDir = path.join(__dirname, '../../temp');
             await fs.mkdir(tempDir, { recursive: true });
             
             const promptFile = path.join(tempDir, `claude_prompt_${Date.now()}.txt`);
             await fs.writeFile(promptFile, prompt);
 
-            // Claude CLI 실행
-            const command = `${this.cliPath} --model ${this.model} --file "${promptFile}"`;
+            // Claude CLI 실행 (stdin 방식)
+            const command = `cat "${promptFile}" | ${this.cliPath} --model ${this.model} --print`;
             const result = execSync(command, { 
                 encoding: 'utf8', 
-                timeout: 30000,
-                maxBuffer: 1024 * 1024 * 10 // 10MB
+                timeout: 60000, // 60초로 증가
+                maxBuffer: 1024 * 1024 * 10, // 10MB
+                shell: true
             });
 
             // 임시 파일 정리
@@ -209,26 +214,99 @@ class ClaudeAgent extends BaseAgent {
     }
 
     /**
-     * 로컬 CLI 응답 처리
+     * 로컬 CLI 응답 처리 (개선된 버전)
      * @param {string} response - CLI 응답
      * @param {Task} task - 원본 태스크
      * @returns {Object} 처리된 결과
      */
     processLocalCLIResponse(response, task) {
         try {
-            // JSON 응답 파싱 시도
-            try {
-                return JSON.parse(response);
-            } catch (parseError) {
-                // JSON 파싱 실패시 텍스트 응답으로 처리
+            // 응답 파싱 및 구조화
+            const parsed = this.responseParser.parseResponse(response, 'claude');
+            
+            // 응답 분석 로깅 (상세 모드에서만)
+            if (process.env.VERBOSE_PARSING === 'true') {
+                this.responseParser.displayParsedResponse(parsed);
+            }
+
+            // JSON 데이터가 있는 경우 우선 사용
+            if (parsed.structure.hasJson && parsed.content.json.length > 0) {
+                const primaryJson = parsed.content.json.find(json => json.valid);
+                if (primaryJson) {
+                    return {
+                        analysis: 'Structured JSON response from Claude CLI',
+                        result: primaryJson.parsed,
+                        reasoning: `Parsed ${primaryJson.type} data with ${Object.keys(primaryJson.parsed).length} properties`,
+                        format: 'json',
+                        source: 'local-cli',
+                        metadata: {
+                            parsed: parsed,
+                            summary: parsed.summary,
+                            structure: parsed.structure
+                        }
+                    };
+                }
+            }
+
+            // 코드 블록이 있는 경우
+            if (parsed.structure.hasCode && parsed.content.codeBlocks.length > 0) {
+                const primaryCode = parsed.content.codeBlocks[0];
                 return {
-                    analysis: 'Response received from Claude CLI',
-                    result: response,
-                    reasoning: 'Raw text response from Claude CLI',
-                    format: 'text',
-                    source: 'local-cli'
+                    analysis: 'Code response from Claude CLI',
+                    result: {
+                        code: primaryCode.code,
+                        language: primaryCode.language,
+                        lineCount: primaryCode.lineCount,
+                        allCodeBlocks: parsed.content.codeBlocks
+                    },
+                    reasoning: `Generated ${primaryCode.language} code with ${primaryCode.lineCount} lines`,
+                    format: 'code',
+                    source: 'local-cli',
+                    metadata: {
+                        parsed: parsed,
+                        summary: parsed.summary,
+                        structure: parsed.structure
+                    }
                 };
             }
+
+            // 구조화된 마크다운 응답
+            if (parsed.structure.hasMarkdown && parsed.content.headers.length > 0) {
+                return {
+                    analysis: 'Structured markdown response from Claude CLI',
+                    result: {
+                        text: parsed.content.text,
+                        headers: parsed.content.headers,
+                        lists: parsed.content.lists,
+                        tables: parsed.content.tables
+                    },
+                    reasoning: `Structured content with ${parsed.content.headers.length} sections`,
+                    format: 'markdown',
+                    source: 'local-cli',
+                    metadata: {
+                        parsed: parsed,
+                        summary: parsed.summary,
+                        structure: parsed.structure
+                    }
+                };
+            }
+
+            // 기본 텍스트 응답
+            return {
+                analysis: 'Text response from Claude CLI',
+                result: parsed.content.text || response,
+                reasoning: `Plain text response (${parsed.content.metadata.wordCount} words, ${parsed.content.metadata.sentiment} sentiment)`,
+                format: 'text',
+                source: 'local-cli',
+                metadata: {
+                    parsed: parsed,
+                    summary: parsed.summary,
+                    structure: parsed.structure,
+                    wordCount: parsed.content.metadata.wordCount,
+                    sentiment: parsed.content.metadata.sentiment
+                }
+            };
+
         } catch (error) {
             throw new Error(`Failed to process Claude CLI response: ${error.message}`);
         }

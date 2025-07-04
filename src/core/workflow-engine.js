@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
 const { Task } = require('../agents/base-agent');
+const { ProjectAnalyzer } = require('./project-analyzer');
 const chalk = require('chalk');
 
 /**
@@ -10,6 +11,9 @@ class WorkflowEngine extends EventEmitter {
         super();
         
         this.config = config;
+        
+        // 프로젝트 분석기 초기화
+        this.projectAnalyzer = new ProjectAnalyzer();
         
         // 활성 워크플로우 저장소
         this.activeWorkflows = new Map();
@@ -207,7 +211,7 @@ class WorkflowEngine extends EventEmitter {
     }
 
     /**
-     * 실행 계획 생성
+     * 실행 계획 생성 (AI 기반 프로젝트 분석)
      * @param {string} assigneeId - 계획 담당자 ID
      * @param {string} projectDescription - 프로젝트 설명
      * @returns {Object} 실행 계획
@@ -215,37 +219,78 @@ class WorkflowEngine extends EventEmitter {
     async createExecutionPlan(assigneeId, projectDescription) {
         const planId = `plan_${Date.now()}`;
         
-        // 프로젝트 복잡도 분석
-        const complexity = this.analyzeProjectComplexity(projectDescription);
+        console.log(chalk.blue('🔍 AI 기반 프로젝트 분석 시작...'));
         
-        // 표준 개발 단계
-        const phases = ['planning', 'research', 'implementation', 'testing', 'deployment'];
-        
-        // 예상 소요 시간 계산
-        const estimatedDuration = this.calculateEstimatedDuration(complexity, phases);
-        
-        const plan = {
-            id: planId,
-            description: projectDescription,
-            assignedBy: assigneeId,
-            phases,
-            complexity,
-            estimatedDuration,
-            createdAt: new Date(),
-            status: 'created'
-        };
-        
-        // 워크플로우 저장
-        this.activeWorkflows.set(planId, plan);
-        
-        // 이벤트 발행
-        this.emit('plan_created', plan);
-        
-        return plan;
+        try {
+            // AI 기반 상세 프로젝트 분석
+            const aiAnalysis = await this.projectAnalyzer.analyzeWithAI(projectDescription);
+            
+            console.log(chalk.green(`✅ 프로젝트 분석 완료 (${aiAnalysis.source})`));
+            console.log(chalk.cyan(`   📊 프로젝트 유형: ${aiAnalysis.project_type}`));
+            console.log(chalk.cyan(`   ⚡ 복잡도: ${aiAnalysis.complexity}`));
+            console.log(chalk.cyan(`   ⏱️  예상 기간: ${aiAnalysis.estimated_duration_days}일`));
+            console.log(chalk.cyan(`   🔧 핵심 기술: ${aiAnalysis.key_technologies.join(', ')}`));
+            console.log(chalk.cyan(`   📋 단계 수: ${aiAnalysis.phases.length}개`));
+            
+            // AI 분석 결과를 기반으로 실행 계획 생성
+            const plan = {
+                id: planId,
+                title: `${aiAnalysis.project_type} 프로젝트`,
+                description: projectDescription,
+                assignedBy: assigneeId,
+                
+                // AI 분석 결과 통합
+                projectType: aiAnalysis.project_type,
+                complexity: aiAnalysis.complexity,
+                estimatedDurationDays: aiAnalysis.estimated_duration_days,
+                keyTechnologies: aiAnalysis.key_technologies,
+                phases: aiAnalysis.phases.map(phase => phase.name),
+                detailedPhases: aiAnalysis.phases,
+                risks: aiAnalysis.risks,
+                recommendations: aiAnalysis.recommendations,
+                
+                // 기존 호환성 유지
+                estimatedDuration: this.calculateDurationFromDays(aiAnalysis.estimated_duration_days),
+                
+                // 메타데이터
+                analysisSource: aiAnalysis.source,
+                createdAt: new Date(),
+                status: 'created'
+            };
+            
+            // 워크플로우 저장
+            this.activeWorkflows.set(planId, plan);
+            
+            // 이벤트 발행
+            this.emit('plan_created', plan);
+            
+            // 위험 요소 및 권장사항 출력
+            if (aiAnalysis.risks && aiAnalysis.risks.length > 0) {
+                console.log(chalk.yellow('⚠️  주요 위험 요소:'));
+                aiAnalysis.risks.forEach(risk => {
+                    console.log(chalk.yellow(`   • ${risk}`));
+                });
+            }
+            
+            if (aiAnalysis.recommendations && aiAnalysis.recommendations.length > 0) {
+                console.log(chalk.blue('💡 권장사항:'));
+                aiAnalysis.recommendations.forEach(rec => {
+                    console.log(chalk.blue(`   • ${rec}`));
+                });
+            }
+            
+            return plan;
+            
+        } catch (error) {
+            console.warn(chalk.yellow('⚠️  AI 분석 실패, 기본 분석으로 대체'));
+            
+            // 폴백: 기존 방식으로 계획 생성
+            return this.createBasicExecutionPlan(assigneeId, projectDescription, planId);
+        }
     }
 
     /**
-     * 태스크 분배
+     * 태스크 분배 (AI 분석 기반)
      * @param {Object} plan - 실행 계획
      * @returns {Array<Task>} 분배된 태스크 목록
      */
@@ -253,12 +298,25 @@ class WorkflowEngine extends EventEmitter {
         const tasks = [];
         let previousTaskId = null;
         
-        for (let i = 0; i < plan.phases.length; i++) {
-            const phase = plan.phases[i];
-            const taskConfig = this.createTaskConfig(phase, plan, previousTaskId);
+        console.log(chalk.blue('📋 태스크 분배 시작...'));
+        
+        // AI 분석 결과가 있는 경우 상세 단계 사용
+        const phasesToProcess = plan.detailedPhases || plan.phases.map(phase => ({
+            name: phase,
+            description: `${phase} 단계`,
+            estimated_hours: 4,
+            role: this.taskClassification[phase]?.role || 'developer',
+            deliverables: ['산출물']
+        }));
+        
+        for (let i = 0; i < phasesToProcess.length; i++) {
+            const phaseDetails = phasesToProcess[i];
+            const taskConfig = this.createEnhancedTaskConfig(phaseDetails, plan, previousTaskId, i);
             
             const task = new Task(taskConfig);
             tasks.push(task);
+            
+            console.log(chalk.green(`   ✅ ${task.id}: ${phaseDetails.description} → ${phaseDetails.role}`));
             
             // 다음 태스크의 의존성으로 현재 태스크 설정
             previousTaskId = task.id;
@@ -267,11 +325,55 @@ class WorkflowEngine extends EventEmitter {
             await this.addTask(task);
         }
         
+        console.log(chalk.blue(`📋 총 ${tasks.length}개 태스크 분배 완료`));
+        
         return tasks;
     }
 
     /**
-     * 태스크 설정 생성
+     * 향상된 태스크 설정 생성 (AI 분석 기반)
+     * @param {Object} phaseDetails - 단계 상세 정보
+     * @param {Object} plan - 실행 계획
+     * @param {string} previousTaskId - 이전 태스크 ID
+     * @param {number} index - 단계 인덱스
+     * @returns {Object} 향상된 태스크 설정
+     */
+    createEnhancedTaskConfig(phaseDetails, plan, previousTaskId, index) {
+        const taskId = `${plan.id}_${phaseDetails.name}_${Date.now()}_${index}`;
+        const classification = this.taskClassification[phaseDetails.name] || {
+            priority: 3,
+            complexity: 'medium',
+            role: phaseDetails.role || 'developer'
+        };
+        
+        // AI 분석에서 제공된 시간 추정 사용
+        const estimatedTimeMs = (phaseDetails.estimated_hours || 4) * 3600000; // 시간을 밀리초로 변환
+        
+        return {
+            id: taskId,
+            type: phaseDetails.name,
+            title: phaseDetails.name.charAt(0).toUpperCase() + phaseDetails.name.slice(1),
+            description: phaseDetails.description || `${phaseDetails.name} for ${plan.description}`,
+            priority: classification.priority,
+            complexity: classification.complexity,
+            dependencies: previousTaskId ? [previousTaskId] : [],
+            estimatedTime: estimatedTimeMs,
+            deliverables: phaseDetails.deliverables || ['산출물'],
+            metadata: {
+                workflowId: plan.id,
+                phase: phaseDetails.name,
+                preferredRole: phaseDetails.role || classification.role,
+                projectType: plan.projectType,
+                keyTechnologies: plan.keyTechnologies,
+                analysisSource: plan.analysisSource,
+                phaseIndex: index,
+                originalEstimatedHours: phaseDetails.estimated_hours
+            }
+        };
+    }
+
+    /**
+     * 태스크 설정 생성 (기존 호환성용)
      * @param {string} phase - 개발 단계
      * @param {Object} plan - 실행 계획
      * @param {string} previousTaskId - 이전 태스크 ID
@@ -578,6 +680,60 @@ class WorkflowEngine extends EventEmitter {
         
         const baseTime = baseTimePerPhase[complexity] || baseTimePerPhase.medium;
         return baseTime * phases.length;
+    }
+
+    /**
+     * 일수를 밀리초로 변환
+     * @param {number} days - 일수
+     * @returns {number} 밀리초
+     */
+    calculateDurationFromDays(days) {
+        return days * 24 * 3600000; // 일 * 시간 * 밀리초
+    }
+
+    /**
+     * 기본 실행 계획 생성 (폴백)
+     * @param {string} assigneeId - 계획 담당자 ID
+     * @param {string} projectDescription - 프로젝트 설명
+     * @param {string} planId - 계획 ID
+     * @returns {Object} 기본 실행 계획
+     */
+    createBasicExecutionPlan(assigneeId, projectDescription, planId) {
+        // 기존 로직을 사용한 기본 분석
+        const complexity = this.analyzeProjectComplexity(projectDescription);
+        const phases = ['planning', 'research', 'implementation', 'testing', 'deployment'];
+        const estimatedDuration = this.calculateEstimatedDuration(complexity, phases);
+        
+        const plan = {
+            id: planId,
+            title: '기본 프로젝트',
+            description: projectDescription,
+            assignedBy: assigneeId,
+            projectType: 'web_application',
+            complexity,
+            estimatedDurationDays: Math.ceil(estimatedDuration / (24 * 3600000)),
+            keyTechnologies: ['javascript', 'html', 'css'],
+            phases,
+            detailedPhases: phases.map(phase => ({
+                name: phase,
+                description: `${phase} 단계`,
+                estimated_hours: 4,
+                role: this.taskClassification[phase]?.role || 'developer',
+                deliverables: ['산출물']
+            })),
+            risks: ['일정 지연', '기술적 복잡성'],
+            recommendations: ['점진적 개발', '정기적 리뷰'],
+            estimatedDuration,
+            analysisSource: 'basic_analysis',
+            createdAt: new Date(),
+            status: 'created'
+        };
+        
+        // 워크플로우 저장
+        this.activeWorkflows.set(planId, plan);
+        this.emit('plan_created', plan);
+        
+        return plan;
     }
 
     /**
