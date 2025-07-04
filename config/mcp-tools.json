@@ -1,0 +1,98 @@
+{
+  "mcpTools": {
+    "yahoo-finance-mcp": {
+      "role": "financial_analysis",
+      "priority": "high",
+      "capabilities": ["stock_data", "market_analysis", "financial_metrics"],
+      "suitableFor": ["researcher", "senior_developer"],
+      "config": {
+        "timeout": 30000,
+        "retries": 3
+      }
+    },
+    "alpha-vantage-mcp": {
+      "role": "market_data",
+      "priority": "medium", 
+      "capabilities": ["real_time_data", "technical_indicators", "forex"],
+      "suitableFor": ["researcher", "developer"],
+      "config": {
+        "timeout": 25000,
+        "retries": 2
+      }
+    },
+    "naver-search-mcp": {
+      "role": "korean_research",
+      "priority": "high",
+      "capabilities": ["web_search", "news_search", "blog_search", "shopping_data"],
+      "suitableFor": ["researcher", "developer"],
+      "config": {
+        "timeout": 20000,
+        "retries": 3
+      }
+    },
+    "exa-mcp": {
+      "role": "academic_research", 
+      "priority": "high",
+      "capabilities": ["research_papers", "company_research", "web_crawling"],
+      "suitableFor": ["researcher", "senior_developer"],
+      "config": {
+        "timeout": 45000,
+        "retries": 2
+      }
+    },
+    "fetch-mcp": {
+      "role": "web_scraping",
+      "priority": "medium",
+      "capabilities": ["html_fetch", "markdown_conversion", "json_parsing"],
+      "suitableFor": ["developer", "researcher"],
+      "config": {
+        "timeout": 15000,
+        "retries": 3
+      }
+    },
+    "supabase-mcp": {
+      "role": "data_management",
+      "priority": "high", 
+      "capabilities": ["database_operations", "real_time_sync", "auth_management"],
+      "suitableFor": ["senior_developer", "developer"],
+      "config": {
+        "timeout": 20000,
+        "retries": 2
+      }
+    },
+    "sequential-thinking": {
+      "role": "problem_solving",
+      "priority": "high",
+      "capabilities": ["step_by_step_analysis", "complex_reasoning", "decision_making"],
+      "suitableFor": ["leader", "senior_developer"],
+      "config": {
+        "timeout": 60000,
+        "retries": 1
+      }
+    },
+    "dart-mcp": {
+      "role": "financial_disclosure",
+      "priority": "medium",
+      "capabilities": ["corporate_data", "financial_statements", "business_analysis"],
+      "suitableFor": ["researcher", "senior_developer"],
+      "config": {
+        "timeout": 30000,
+        "retries": 2
+      }
+    }
+  },
+  "assignmentRules": {
+    "research": ["naver-search-mcp", "exa-mcp", "fetch-mcp"],
+    "financial_analysis": ["yahoo-finance-mcp", "alpha-vantage-mcp", "dart-mcp"],
+    "data_management": ["supabase-mcp"],
+    "complex_reasoning": ["sequential-thinking"],
+    "web_scraping": ["fetch-mcp", "exa-mcp"],
+    "market_research": ["naver-search-mcp", "yahoo-finance-mcp"]
+  },
+  "fallbackTools": {
+    "research": "fetch-mcp",
+    "financial_analysis": "yahoo-finance-mcp", 
+    "data_management": "fetch-mcp",
+    "web_scraping": "fetch-mcp"
+  }
+}

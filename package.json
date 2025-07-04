@@ -1,0 +1,50 @@
+{
+  "name": "claude-gemini-team",
+  "version": "1.0.0",
+  "description": "Claude-Gemini multi-agent collaboration system",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "test:unit": "jest tests/unit/",
+    "test:integration": "jest tests/integration/",
+    "test:e2e": "jest tests/e2e/",
+    "test:all": "node tests/run-integration-tests.js",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "dashboard": "node src/cli.js dashboard",
+    "web-dashboard": "node src/cli.js web-dashboard",
+    "full-dashboard": "node src/cli.js full-dashboard",
+    "monitor": "node src/cli.js monitor",
+    "monitor-simple": "node src/cli.js monitor-simple",
+    "add-member": "node src/cli.js add-member"
+  },
+  "keywords": [
+    "ai",
+    "multi-agent",
+    "claude",
+    "gemini",
+    "mcp",
+    "collaboration"
+  ],
+  "author": "Claude Code",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "chokidar": "^4.0.3",
+    "commander": "^14.0.0",
+    "eslint": "^9.30.1",
+    "jest": "^30.0.4",
+    "nodemon": "^3.1.10",
+    "redis": "^5.5.6",
+    "winston": "^3.17.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "babel-jest": "^30.0.4"
+  }
+}

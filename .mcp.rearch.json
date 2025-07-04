@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "fetch-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "fetch-mcp",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "naver-search-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@isnow890/naver-search-mcp",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265",
+        "--profile",
+        "medical-krill-r0NdS4"
+      ]
+    },
+    "exa": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "exa",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "ccusage": {
+      "command": "npx",
+      "args": [
+        "ccusage@latest"
+      ]
+    }
+  }
+}    

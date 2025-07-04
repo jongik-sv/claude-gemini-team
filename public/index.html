@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude-Gemini Team Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Consolas', monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem 2rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.connected {
+            background: #4caf50;
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: #f44336;
+            color: white;
+        }
+
+        .connection-status.connecting {
+            background: #ff9800;
+            color: white;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 1rem;
+            padding: 1rem;
+            height: calc(100vh - 120px);
+        }
+
+        .panel {
+            background: #2d2d2d;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #404040;
+            overflow-y: auto;
+        }
+
+        .panel h2 {
+            color: #64b5f6;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .system-overview {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .metric {
+            background: #333;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .agents-panel {
+            grid-column: 1;
+        }
+
+        .logs-panel {
+            grid-column: 2;
+        }
+
+        .agent {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #333;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+
+        .agent.claude_leader { border-left-color: #00bcd4; }
+        .agent.claude_senior { border-left-color: #2196f3; }
+        .agent.gemini_researcher { border-left-color: #4caf50; }
+        .agent.gemini_developer { border-left-color: #ffeb3b; }
+
+        .agent-icon {
+            font-size: 1.5rem;
+            margin-right: 0.75rem;
+        }
+
+        .agent-info {
+            flex: 1;
+        }
+
+        .agent-name {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .agent-status {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .agent-progress {
+            margin-top: 0.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #555;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border-bottom: 1px solid #404040;
+            font-size: 0.85rem;
+        }
+
+        .log-timestamp {
+            color: #888;
+            min-width: 60px;
+            font-size: 0.75rem;
+        }
+
+        .log-agent {
+            min-width: 100px;
+            font-weight: bold;
+        }
+
+        .log-agent.claude_leader { color: #00bcd4; }
+        .log-agent.claude_senior { color: #2196f3; }
+        .log-agent.gemini_researcher { color: #4caf50; }
+        .log-agent.gemini_developer { color: #ffeb3b; }
+        .log-agent.system { color: #e91e63; }
+        .log-agent.workflow { color: #ff5722; }
+
+        .log-level {
+            min-width: 60px;
+            font-weight: bold;
+        }
+
+        .log-level.error { color: #f44336; }
+        .log-level.warn { color: #ff9800; }
+        .log-level.info { color: #2196f3; }
+        .log-level.debug { color: #9e9e9e; }
+
+        .log-message {
+            flex: 1;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background: #555;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #666;
+        }
+
+        .btn.active {
+            background: #2196f3;
+        }
+
+        .workflows-panel {
+            grid-column: 1 / -1;
+            max-height: 200px;
+        }
+
+        .workflow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #333;
+            border-radius: 6px;
+        }
+
+        .workflow-info {
+            flex: 1;
+        }
+
+        .workflow-title {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .workflow-progress {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .workflow-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .workflow-status.active {
+            background: #4caf50;
+            color: white;
+        }
+
+        .workflow-status.completed {
+            background: #2196f3;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        .notification {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            padding: 1rem;
+            background: #333;
+            border-left: 4px solid #4caf50;
+            border-radius: 4px;
+            color: white;
+            max-width: 300px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            border-left-color: #f44336;
+        }
+
+        .notification.warning {
+            border-left-color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Claude-Gemini Team Dashboard</h1>
+        <div class="subtitle">Real-time Multi-Agent Collaboration Monitor</div>
+    </div>
+
+    <div class="connection-status" id="connectionStatus">
+        🔄 Connecting...
+    </div>
+
+    <div class="dashboard">
+        <div class="panel system-overview">
+            <div class="metric">
+                <div class="metric-value" id="activeAgents">0</div>
+                <div class="metric-label">Active Agents</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="activeTasks">0</div>
+                <div class="metric-label">Active Tasks</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="completedTasks">0</div>
+                <div class="metric-label">Completed Tasks</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="successRate">100%</div>
+                <div class="metric-label">Success Rate</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="uptime">0s</div>
+                <div class="metric-label">System Uptime</div>
+            </div>
+        </div>
+
+        <div class="panel agents-panel">
+            <h2>👥 Team Status</h2>
+            <div id="agentsList">
+                <!-- Agents will be populated here -->
+            </div>
+        </div>
+
+        <div class="panel logs-panel">
+            <h2>📋 Activity Logs</h2>
+            <div id="logsList">
+                <!-- Logs will be populated here -->
+            </div>
+        </div>
+
+        <div class="panel workflows-panel">
+            <h2>🔄 Active Workflows</h2>
+            <div id="workflowsList">
+                <!-- Workflows will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="pauseBtn">⏸️ Pause</button>
+        <button class="btn" id="clearBtn">🗑️ Clear Logs</button>
+        <button class="btn" id="exportBtn">💾 Export</button>
+    </div>
+
+    <div class="notification" id="notification">
+        <div id="notificationText"></div>
+    </div>
+
+    <script>
+        class TeamDashboard {
+            constructor() {
+                this.socket = null;
+                this.isConnected = false;
+                this.isPaused = false;
+                this.agents = new Map();
+                this.workflows = new Map();
+                this.logs = [];
+                this.maxLogs = 100;
+                this.stats = {
+                    activeTasks: 0,
+                    completedTasks: 0,
+                    failedTasks: 0,
+                    startTime: Date.now()
+                };
+                
+                this.initializeUI();
+                this.connect();
+            }
+
+            initializeUI() {
+                // Control buttons
+                document.getElementById('pauseBtn').addEventListener('click', () => this.togglePause());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearLogs());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+
+                // Initialize with sample data
+                this.addSampleAgents();
+                this.updateDisplay();
+                this.updateSystemMetrics();
+            }
+
+            addSampleAgents() {
+                this.agents.set('claude_leader', {
+                    id: 'claude_leader',
+                    name: 'Team Leader',
+                    role: 'leader',
+                    status: 'idle',
+                    currentTask: null,
+                    tasksCompleted: 0,
+                    workload: 0,
+                    icon: '👑'
+                });
+
+                this.agents.set('claude_senior', {
+                    id: 'claude_senior',
+                    name: 'Senior Developer',
+                    role: 'senior_developer',
+                    status: 'idle',
+                    currentTask: null,
+                    tasksCompleted: 0,
+                    workload: 0,
+                    icon: '🏗️'
+                });
+
+                this.agents.set('gemini_researcher', {
+                    id: 'gemini_researcher',
+                    name: 'Researcher',
+                    role: 'researcher',
+                    status: 'idle',
+                    currentTask: null,
+                    tasksCompleted: 0,
+                    workload: 0,
+                    icon: '🔍'
+                });
+
+                this.agents.set('gemini_developer', {
+                    id: 'gemini_developer',
+                    name: 'Developer',
+                    role: 'developer',
+                    status: 'idle',
+                    currentTask: null,
+                    tasksCompleted: 0,
+                    workload: 0,
+                    icon: '💻'
+                });
+            }
+
+            connect() {
+                try {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}`;
+                    
+                    this.socket = new WebSocket(wsUrl);
+                    this.updateConnectionStatus('connecting');
+
+                    this.socket.onopen = () => {
+                        this.isConnected = true;
+                        this.updateConnectionStatus('connected');
+                        this.subscribe();
+                        this.showNotification('Connected to team system', 'success');
+                    };
+
+                    this.socket.onmessage = (event) => {
+                        this.handleMessage(JSON.parse(event.data));
+                    };
+
+                    this.socket.onclose = () => {
+                        this.isConnected = false;
+                        this.updateConnectionStatus('disconnected');
+                        this.showNotification('Disconnected from team system', 'error');
+                        
+                        // Reconnect after 5 seconds
+                        setTimeout(() => this.connect(), 5000);
+                    };
+
+                    this.socket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.showNotification('Connection error', 'error');
+                    };
+
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateConnectionStatus('disconnected');
+                }
+            }
+
+            subscribe() {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({
+                        type: 'subscribe',
+                        events: ['*'] // Subscribe to all events
+                    }));
+                }
+            }
+
+            handleMessage(message) {
+                if (this.isPaused) return;
+
+                switch (message.type) {
+                    case 'welcome':
+                        console.log('Welcome message:', message);
+                        break;
+                    
+                    case 'event':
+                        this.handleEvent(message.eventType, message.data);
+                        break;
+                    
+                    case 'ping':
+                        this.socket.send(JSON.stringify({ type: 'pong' }));
+                        break;
+                    
+                    default:
+                        console.log('Unknown message type:', message.type);
+                }
+            }
+
+            handleEvent(eventType, data) {
+                switch (eventType) {
+                    case 'agent_status_changed':
+                        this.updateAgentStatus(data.agentId, data.status, data);
+                        break;
+                    
+                    case 'task_started':
+                        this.handleTaskStarted(data);
+                        break;
+                    
+                    case 'task_completed':
+                        this.handleTaskCompleted(data);
+                        break;
+                    
+                    case 'task_failed':
+                        this.handleTaskFailed(data);
+                        break;
+                    
+                    case 'workflow_started':
+                        this.handleWorkflowStarted(data);
+                        break;
+                    
+                    case 'workflow_completed':
+                        this.handleWorkflowCompleted(data);
+                        break;
+                    
+                    case 'log_message':
+                        this.addLogEntry(data);
+                        break;
+                    
+                    case 'system_event':
+                        this.handleSystemEvent(data);
+                        break;
+                }
+
+                this.updateDisplay();
+                this.updateSystemMetrics();
+            }
+
+            updateAgentStatus(agentId, status, data) {
+                const agent = this.agents.get(agentId);
+                if (agent) {
+                    agent.status = status;
+                    if (data.currentTask) {
+                        agent.currentTask = data.currentTask;
+                    }
+                    if (data.workload !== undefined) {
+                        agent.workload = data.workload;
+                    }
+                }
+            }
+
+            handleTaskStarted(data) {
+                this.stats.activeTasks++;
+                this.updateAgentStatus(data.agentId, 'working', {
+                    currentTask: { id: data.taskId, title: data.taskTitle }
+                });
+                this.addLogEntry({
+                    agentId: data.agentId,
+                    level: 'info',
+                    message: `🚀 Started: ${data.taskTitle}`,
+                    timestamp: data.timestamp
+                });
+            }
+
+            handleTaskCompleted(data) {
+                this.stats.activeTasks = Math.max(0, this.stats.activeTasks - 1);
+                this.stats.completedTasks++;
+                
+                const agent = this.agents.get(data.agentId);
+                if (agent) {
+                    agent.tasksCompleted++;
+                    agent.currentTask = null;
+                    agent.status = 'idle';
+                }
+
+                this.addLogEntry({
+                    agentId: data.agentId,
+                    level: 'info',
+                    message: `✅ Completed: ${data.taskTitle} (${data.duration}ms)`,
+                    timestamp: data.timestamp
+                });
+            }
+
+            handleTaskFailed(data) {
+                this.stats.activeTasks = Math.max(0, this.stats.activeTasks - 1);
+                this.stats.failedTasks++;
+                
+                const agent = this.agents.get(data.agentId);
+                if (agent) {
+                    agent.currentTask = null;
+                    agent.status = 'failed';
+                }
+
+                this.addLogEntry({
+                    agentId: data.agentId,
+                    level: 'error',
+                    message: `❌ Failed: ${data.taskTitle} - ${data.error}`,
+                    timestamp: data.timestamp
+                });
+            }
+
+            handleWorkflowStarted(data) {
+                this.workflows.set(data.workflowId, {
+                    id: data.workflowId,
+                    title: data.title,
+                    totalTasks: data.totalTasks,
+                    completedTasks: 0,
+                    status: 'active',
+                    startTime: data.timestamp
+                });
+
+                this.addLogEntry({
+                    agentId: 'workflow',
+                    level: 'info',
+                    message: `🎬 Workflow started: ${data.title}`,
+                    timestamp: data.timestamp
+                });
+            }
+
+            handleWorkflowCompleted(data) {
+                const workflow = this.workflows.get(data.workflowId);
+                if (workflow) {
+                    workflow.status = 'completed';
+                    workflow.duration = data.duration;
+                }
+
+                this.addLogEntry({
+                    agentId: 'workflow',
+                    level: 'info',
+                    message: `🎉 Workflow completed: ${data.title} (${data.duration}ms)`,
+                    timestamp: data.timestamp
+                });
+            }
+
+            handleSystemEvent(data) {
+                this.addLogEntry({
+                    agentId: 'system',
+                    level: 'info',
+                    message: `⚙️ ${data.eventType}: ${JSON.stringify(data.data)}`,
+                    timestamp: data.timestamp || new Date().toISOString()
+                });
+            }
+
+            addLogEntry(data) {
+                this.logs.unshift({
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    agentId: data.agentId,
+                    level: data.level,
+                    message: data.message
+                });
+
+                if (this.logs.length > this.maxLogs) {
+                    this.logs = this.logs.slice(0, this.maxLogs);
+                }
+            }
+
+            updateDisplay() {
+                this.updateAgentsDisplay();
+                this.updateLogsDisplay();
+                this.updateWorkflowsDisplay();
+            }
+
+            updateAgentsDisplay() {
+                const container = document.getElementById('agentsList');
+                container.innerHTML = '';
+
+                this.agents.forEach(agent => {
+                    const agentDiv = document.createElement('div');
+                    agentDiv.className = `agent ${agent.id}`;
+                    
+                    const statusText = agent.currentTask 
+                        ? `Working on: ${agent.currentTask.title}`
+                        : agent.status.charAt(0).toUpperCase() + agent.status.slice(1);
+
+                    agentDiv.innerHTML = `
+                        <div class="agent-icon">${agent.icon}</div>
+                        <div class="agent-info">
+                            <div class="agent-name">${agent.name}</div>
+                            <div class="agent-status">${statusText}</div>
+                            <div class="agent-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${agent.workload}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    container.appendChild(agentDiv);
+                });
+            }
+
+            updateLogsDisplay() {
+                const container = document.getElementById('logsList');
+                container.innerHTML = '';
+
+                this.logs.slice(0, 20).forEach(log => {
+                    const logDiv = document.createElement('div');
+                    logDiv.className = 'log-entry';
+                    
+                    const time = new Date(log.timestamp).toLocaleTimeString().slice(0, 5);
+                    
+                    logDiv.innerHTML = `
+                        <div class="log-timestamp">${time}</div>
+                        <div class="log-agent ${log.agentId}">${log.agentId}</div>
+                        <div class="log-level ${log.level}">${log.level.toUpperCase()}</div>
+                        <div class="log-message">${log.message}</div>
+                    `;
+                    
+                    container.appendChild(logDiv);
+                });
+            }
+
+            updateWorkflowsDisplay() {
+                const container = document.getElementById('workflowsList');
+                container.innerHTML = '';
+
+                this.workflows.forEach(workflow => {
+                    const workflowDiv = document.createElement('div');
+                    workflowDiv.className = 'workflow';
+                    
+                    const progress = workflow.totalTasks > 0 
+                        ? Math.round((workflow.completedTasks / workflow.totalTasks) * 100)
+                        : 0;
+
+                    workflowDiv.innerHTML = `
+                        <div class="workflow-info">
+                            <div class="workflow-title">${workflow.title}</div>
+                            <div class="workflow-progress">${workflow.completedTasks}/${workflow.totalTasks} tasks (${progress}%)</div>
+                        </div>
+                        <div class="workflow-status ${workflow.status}">${workflow.status.toUpperCase()}</div>
+                    `;
+                    
+                    container.appendChild(workflowDiv);
+                });
+
+                if (this.workflows.size === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #888; padding: 2rem;">No active workflows</div>';
+                }
+            }
+
+            updateSystemMetrics() {
+                const activeAgents = Array.from(this.agents.values()).filter(a => a.status !== 'idle').length;
+                const totalTasks = this.stats.completedTasks + this.stats.failedTasks;
+                const successRate = totalTasks > 0 ? Math.round((this.stats.completedTasks / totalTasks) * 100) : 100;
+                const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
+
+                document.getElementById('activeAgents').textContent = activeAgents;
+                document.getElementById('activeTasks').textContent = this.stats.activeTasks;
+                document.getElementById('completedTasks').textContent = this.stats.completedTasks;
+                document.getElementById('successRate').textContent = successRate + '%';
+                document.getElementById('uptime').textContent = this.formatUptime(uptime);
+            }
+
+            formatUptime(seconds) {
+                if (seconds < 60) return seconds + 's';
+                if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+                return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
+            }
+
+            updateConnectionStatus(status) {
+                const statusEl = document.getElementById('connectionStatus');
+                statusEl.className = `connection-status ${status}`;
+                
+                switch (status) {
+                    case 'connected':
+                        statusEl.textContent = '✅ Connected';
+                        break;
+                    case 'connecting':
+                        statusEl.textContent = '🔄 Connecting...';
+                        break;
+                    case 'disconnected':
+                        statusEl.textContent = '❌ Disconnected';
+                        break;
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.getElementById('notification');
+                const text = document.getElementById('notificationText');
+                
+                text.textContent = message;
+                notification.className = `notification ${type}`;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                const btn = document.getElementById('pauseBtn');
+                btn.textContent = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
+                btn.classList.toggle('active', this.isPaused);
+            }
+
+            clearLogs() {
+                this.logs = [];
+                this.updateLogsDisplay();
+                this.showNotification('Logs cleared', 'info');
+            }
+
+            exportData() {
+                const data = {
+                    timestamp: new Date().toISOString(),
+                    agents: Array.from(this.agents.values()),
+                    workflows: Array.from(this.workflows.values()),
+                    logs: this.logs,
+                    stats: this.stats
+                };
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `team-dashboard-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                this.showNotification('Data exported', 'success');
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new TeamDashboard();
+        });
+    </script>
+</body>
+</html>

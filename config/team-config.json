@@ -1,0 +1,43 @@
+{
+  "team": {
+    "maxSize": 10,
+    "defaultRoles": ["leader", "senior_developer", "researcher", "developer"],
+    "defaultCapabilities": {
+      "leader": ["planning", "coordination", "quality_assurance", "strategic_thinking"],
+      "senior_developer": ["complex_coding", "architecture", "debugging", "code_review"],
+      "researcher": ["data_collection", "analysis", "documentation", "research"],
+      "developer": ["coding", "testing", "maintenance", "implementation"]
+    },
+    "colors": {
+      "claude_leader": "blue",
+      "kim_senior": "cyan", 
+      "lee_researcher": "green",
+      "park_developer": "yellow"
+    }
+  },
+  "communication": {
+    "messageTimeout": 30000,
+    "retryAttempts": 3,
+    "heartbeatInterval": 10000,
+    "queueSize": 1000
+  },
+  "performance": {
+    "maxConcurrentTasks": 10,
+    "taskTimeout": 300000,
+    "cacheTimeout": 3600,
+    "monitoringInterval": 5000
+  },
+  "security": {
+    "validateInputs": true,
+    "sanitizeOutputs": true,
+    "logSensitiveData": false,
+    "encryptCommunication": false
+  },
+  "logging": {
+    "level": "info",
+    "enableColors": true,
+    "enableTimestamp": true,
+    "maxLogFiles": 10,
+    "maxLogSize": "10MB"
+  }
+}

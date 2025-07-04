@@ -1,0 +1,78 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "alpha-ventage-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@deepsuthar496/alpha-ventage-mcp",
+        "--key",
+        "39869d4b-70de-4744-b8b7-ec51dc0f69b8",
+        "--profile",
+        "rough-butterfly-xqjLDj"
+      ]
+    },
+    "fetch-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "fetch-mcp",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "naver-search-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@isnow890/naver-search-mcp",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265",
+        "--profile",
+        "medical-krill-r0NdS4"
+      ]
+    },
+    "exa": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "exa",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "dart-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@2geonhyup/dart-mcp",
+        "--key",
+        "39869d4b-70de-4744-b8b7-ec51dc0f69b8",
+        "--profile",
+        "rough-butterfly-xqjLDj"
+      ]
+    },
+    "ccusage": {
+      "command": "npx",
+      "args": [
+        "ccusage@latest"
+      ]
+    }
+  }
+}    

@@ -1,0 +1,61 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=bifocdkfviqeonfmfwvs"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_b6dc12f28750977c5a939f8ccc0dc6a34f49ec5d"
+      }
+    },
+    "fetch-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "fetch-mcp",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "exa": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "exa",
+        "--key",
+        "edd85a01-7988-4db5-8783-a1bc1ad22265"
+      ]
+    },
+    "Context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "description":""
+    },    
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "ccusage": {
+      "command": "npx",
+      "args": [
+        "ccusage@latest"
+      ]
+    }
+  }
+}    
